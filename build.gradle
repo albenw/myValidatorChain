@@ -18,4 +18,5 @@ dependencies {
     compile 'org.slf4j:slf4j-api:1.7.25'
     compile 'ch.qos.logback:logback-classic:1.1.7'
     compile 'org.springframework:spring-context-support:4.0.5.RELEASE'
+    testCompile 'org.springframework:spring-test:4.0.5.RELEASE'
 }

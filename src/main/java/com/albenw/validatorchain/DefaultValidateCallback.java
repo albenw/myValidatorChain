@@ -1,26 +1,26 @@
 package com.albenw.validatorchain;
 
+import com.albenw.validatorchain.base.Validator;
 import com.albenw.validatorchain.base.ValidatorContext;
-import com.albenw.validatorchain.base.ValidatorUnit;
 
 import java.util.List;
 
 /**
  * @author alben.wong
  */
-public class DefaultValidateCallback implements ValidatorCallback {
+public class DefaultValidateCallback<T> implements ValidatorCallback<T> {
 
     @Override
-    public void onSuccess(List<ValidatorUnit> units, ValidatorContext context) {
+    public void onSuccess(T target, List<Validator> validators, ValidatorContext context) {
     }
 
     @Override
-    public void onFail(List<ValidatorUnit> units, ValidatorContext context) {
+    public void onFail(T target, List<Validator> validators, ValidatorContext context) {
 
     }
 
     @Override
-    public void onUncaughtException(List<ValidatorUnit> units, ValidatorContext context, Exception e) {
+    public void onException(T target, List<Validator> validators, ValidatorContext context, Exception e) {
 
     }
 

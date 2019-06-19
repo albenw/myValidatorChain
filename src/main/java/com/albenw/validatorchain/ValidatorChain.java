@@ -1,9 +1,9 @@
 package com.albenw.validatorchain;
 
+import com.albenw.validatorchain.base.SceneProvider;
 import com.albenw.validatorchain.base.Validator;
 import com.albenw.validatorchain.base.ValidatorContext;
 import com.albenw.validatorchain.base.ValidatorResult;
-import com.albenw.validatorchain.base.ValidatorUnit;
 import com.albenw.validatorchain.factory.SimpleValidatorFactory;
 import com.albenw.validatorchain.factory.ValidatorFactory;
 import com.albenw.validatorchain.util.CollectionUtils;
@@ -12,10 +12,10 @@ import lombok.Setter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.util.LinkedList;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.BiConsumer;
+import java.util.stream.Collectors;
 
 /**
  * @author alben.wong
@@ -36,9 +36,9 @@ public class ValidatorChain {
     private ValidatorContext context = new ValidatorContext();
 
     /**
-     * 校验对象和校验器
+     * 校验的对象
      */
-    private List<ValidatorUnit> validatorUnits = new LinkedList<>();
+    Object target;
 
     /**
      * 生成validator的工厂
@@ -54,6 +54,30 @@ public class ValidatorChain {
      * 校验结果
      */
     private ValidatorResult result;
+
+    /**
+     * 全部场景都需要的校验器
+     * <validator-class-name>
+     */
+    private List<String> allSceneValidators = new ArrayList<>();
+
+    /**
+     * 场景与校验器的映射
+     * <scene-name, validator-class-name>
+     */
+    private Map<String, List<String>> sceneValidatorMap = new ConcurrentHashMap<>();
+
+    /**
+     * 校验器类名与校验器的映射
+     * <validator-class-name, validator-instance>
+     */
+    private Map<String, Validator> validators = new ConcurrentHashMap<>();
+
+    /**
+     * 场景提供器
+     */
+    private SceneProvider sceneProvider;
+
 
     private ValidatorChain() {
 
@@ -73,34 +97,57 @@ public class ValidatorChain {
         return this;
     }
 
-    public <T, E extends Validator> ValidatorChain addLast(T target, Class<E> validatorType) throws Exception{
+    public ValidatorChain target(Object target){
+        this.target = target;
+        return this;
+    }
+
+    public <E extends Validator> ValidatorChain addLast(Class<E> validatorType) throws Exception {
         if(validatorType == null){
             throw new NullPointerException("validatorType can not be null");
         }
-        if(!checkDuplicate(target, validatorType)){
-            Validator validator = ValidatorCache.getByType(this.validatorFactory, validatorType);
-            validatorUnits.add(new ValidatorUnit<T>(target, validator));
+        Validator validator = ValidatorCache.getByType(this.validatorFactory, validatorType);
+        addToAllSceneValidator(validatorType.getName());
+        validators.put(validatorType.getName(), validator);
+        return this;
+    }
+
+    public <E extends Validator> ValidatorChain addLast(Class<E> validatorType, List<String> scenes) throws Exception{
+        if(validatorType == null){
+            throw new NullPointerException("validatorType can not be null");
+        }
+        if(CollectionUtils.isEmpty(scenes)){
+            throw new NullPointerException("scenes can not be empty");
+        }
+        Validator validator = ValidatorCache.getByType(this.validatorFactory, validatorType);
+        validators.put(validatorType.getName(), validator);
+        for(String scene : scenes){
+            addScene(scene, validator);
         }
         return this;
     }
 
-    public <T> ValidatorChain addLast(T target, Validator<T> validatorInstance) {
+    public <T> ValidatorChain addLast(Validator<T> validatorInstance) {
         if(validatorInstance == null){
             throw new NullPointerException("validatorInstance can not be null");
         }
-        if(!checkDuplicate(target, validatorInstance.getClass())){
-            validatorUnits.add(new ValidatorUnit<T>(target, validatorInstance));
-        }
+        allSceneValidators.add(validatorInstance.getClass().getName());
+        validators.put(validatorInstance.getClass().getName(), validatorInstance);
         return this;
     }
 
-    private boolean checkDuplicate(Object target, Class type){
-        for(ValidatorUnit unit : validatorUnits) {
-            if (unit.getTarget().toString().equals(target.toString()) && unit.getValidator().getClass().getName().equals(type.getName())) {
-                return true;
-            }
+    public <T> ValidatorChain addLast(Validator<T> validatorInstance, List<String> scenes) {
+        if(validatorInstance == null){
+            throw new NullPointerException("validatorInstance can not be null");
         }
-        return false;
+        if(CollectionUtils.isEmpty(scenes)){
+            throw new NullPointerException("scenes can not be empty");
+        }
+        validators.put(validatorInstance.getClass().getName(), validatorInstance);
+        for(String scene : scenes){
+            addScene(scene, validatorInstance);
+        }
+        return this;
     }
 
     public <E extends ValidatorCallback> ValidatorChain callback(E callback){
@@ -111,23 +158,25 @@ public class ValidatorChain {
         return this;
     }
 
+    public ValidatorChain sceneProvider(SceneProvider sceneProvider){
+        this.sceneProvider = sceneProvider;
+        return this;
+    }
+
     @SuppressWarnings("unchecked")
     public ValidatorChain doValidate() throws Exception {
-        if(CollectionUtils.isEmpty(validatorUnits)){
-            logger.warn("not any validators configured");
-            return this;
-        }
+        this.checkArgs();
         ValidatorResult result = new ValidatorResult();
         this.result = result;
         context.setResult(result);
-        for(ValidatorUnit unit : validatorUnits){
-            Object target = unit.getTarget();
-            Validator validator = unit.getValidator();
+        List<String> scenes = this.sceneProvider.decide(target);
+        List<Validator> dealValidators = getDealValidators(scenes);
+        for(Validator validator : dealValidators){
             try{
-                if(!validator.accept(target, context)){
+                if(!validator.accept(target ,context)){
                     continue;
                 }
-                if(!validator.validate(target, context)){
+                if(!validator.validate(target ,context)){
                     result.setIsSuccess(false);
                     if(this.isFailFast){
                         break;
@@ -138,7 +187,7 @@ public class ValidatorChain {
                 result.setIsSuccess(false);
                 try{
                     validator.onException(target, context, e);
-                    callback.onUncaughtException(validatorUnits, context, e);
+                    callback.onException(target, dealValidators, context, e);
                 }catch (Exception e2){
                     logger.error("validate chain exception in the course of exception", e);
                     throw e;
@@ -146,9 +195,9 @@ public class ValidatorChain {
             }
         }
         if(result.getIsSuccess()){
-            callback.onSuccess(validatorUnits, context);
+            callback.onSuccess(target, dealValidators, context);
         }else{
-            callback.onFail(validatorUnits, context);
+            callback.onFail(target, dealValidators, context);
         }
         return this;
     }
@@ -165,6 +214,45 @@ public class ValidatorChain {
     public ValidatorChain setAttribute(String key, Object obj){
         context.addAttribute(key, obj);
         return this;
+    }
+
+    private void addScene(String scene, Validator validator){
+        if(!sceneValidatorMap.containsKey(scene)){
+            sceneValidatorMap.put(scene, new ArrayList<>());
+        }
+        List<String> sceneValidators = sceneValidatorMap.get(scene);
+        if(!sceneValidators.contains(validator.getClass().getName())){
+            sceneValidators.add(validator.getClass().getName());
+        }
+    }
+
+    private void checkArgs(){
+        if(target == null){
+            throw new NullPointerException("target can not be null");
+        }
+        if(validators.isEmpty()){
+            throw new NullPointerException("there is no any validators, please use addLast to add one");
+        }
+        if(sceneProvider == null){
+            throw new NullPointerException("sceneProvider can not be null");
+        }
+    }
+
+    private void addToAllSceneValidator(String validatorTypeName){
+        if(!allSceneValidators.contains(validatorTypeName)){
+            allSceneValidators.add(validatorTypeName);
+        }
+    }
+
+    private List<Validator> getDealValidators(List<String> scenes){
+        //处理全部的场景
+        List<String> dealValidators = new ArrayList<>(allSceneValidators);
+        for(String scene : scenes){
+            if(sceneValidatorMap.containsKey(scene)){
+                dealValidators.addAll(sceneValidatorMap.get(scene));
+            }
+        }
+        return dealValidators.stream().map(validators::get).filter(Objects::nonNull).collect(Collectors.toList());
     }
 
 }

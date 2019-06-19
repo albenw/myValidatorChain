@@ -14,6 +14,7 @@ public class StockVo {
 
     private Long paId;
     private String vendorCode;
+    private Integer type;
     private List<StockItemVo> items;
 
     @Setter @Getter
