@@ -102,7 +102,14 @@ public class ValidatorChain {
         return this;
     }
 
-    public <E extends Validator> ValidatorChain addLast(Class<E> validatorType) throws Exception {
+    /**
+     * 增加一个通用的校验
+     * @param validatorType
+     * @param <E>
+     * @return
+     * @throws Exception
+     */
+    public <E extends Validator> ValidatorChain add(Class<E> validatorType) throws Exception {
         if(validatorType == null){
             throw new NullPointerException("validatorType can not be null");
         }
@@ -112,7 +119,15 @@ public class ValidatorChain {
         return this;
     }
 
-    public <E extends Validator> ValidatorChain addLast(Class<E> validatorType, List<String> scenes) throws Exception{
+    /**
+     * 增加一个适用于某些场景的校验器
+     * @param validatorType
+     * @param scenes
+     * @param <E>
+     * @return
+     * @throws Exception
+     */
+    public <E extends Validator> ValidatorChain add(Class<E> validatorType, List<String> scenes) throws Exception{
         if(validatorType == null){
             throw new NullPointerException("validatorType can not be null");
         }
@@ -127,7 +142,13 @@ public class ValidatorChain {
         return this;
     }
 
-    public <T> ValidatorChain addLast(Validator<T> validatorInstance) {
+    /**
+     * 增加一个通用的校验
+     * @param validatorInstance
+     * @param <T>
+     * @return
+     */
+    public <T> ValidatorChain add(Validator<T> validatorInstance) {
         if(validatorInstance == null){
             throw new NullPointerException("validatorInstance can not be null");
         }
@@ -136,7 +157,14 @@ public class ValidatorChain {
         return this;
     }
 
-    public <T> ValidatorChain addLast(Validator<T> validatorInstance, List<String> scenes) {
+    /**
+     * 增加一个适用于某些场景的校验器
+     * @param validatorInstance
+     * @param scenes
+     * @param <T>
+     * @return
+     */
+    public <T> ValidatorChain add(Validator<T> validatorInstance, List<String> scenes) {
         if(validatorInstance == null){
             throw new NullPointerException("validatorInstance can not be null");
         }
@@ -163,6 +191,11 @@ public class ValidatorChain {
         return this;
     }
 
+    /**
+     * 运行校验器
+     * @return
+     * @throws Exception
+     */
     @SuppressWarnings("unchecked")
     public ValidatorChain doValidate() throws Exception {
         this.checkArgs();
@@ -202,6 +235,11 @@ public class ValidatorChain {
         return this;
     }
 
+    /**
+     * 汇总结果
+     * 对于错误信息，内部的格式是：Map<String, List<String>>
+     * @param biConsumer
+     */
     public void result(BiConsumer<String, List<String>> biConsumer) {
         if(this.result == null){
             throw new NullPointerException("do validate before get the result");
@@ -211,6 +249,12 @@ public class ValidatorChain {
         }
     }
 
+    /**
+     * 增加一个attribute到context
+     * @param key
+     * @param obj
+     * @return
+     */
     public ValidatorChain setAttribute(String key, Object obj){
         context.addAttribute(key, obj);
         return this;

@@ -32,7 +32,7 @@ public class ValidatorChainTest {
     @Test
     public void test1(){
         StockVo stockVo = new StockVo();
-        stockVo.setPaId(1L);
+        stockVo.setId(1L);
         stockVo.setVendorCode("123");
         stockVo.setType(1);
         try{
@@ -41,8 +41,8 @@ public class ValidatorChainTest {
                     .target(stockVo)
                     .sceneProvider(stockSceneProvider)
                     .useFactory(springValidatorFactory)
-                    .addLast(StockVoValidator.class, Arrays.asList("scene1"))
-                    .addLast(stockVoValidatorV2, Arrays.asList("scene2"))
+                    .add(StockVoValidator.class, Arrays.asList("scene1"))
+                    .add(stockVoValidatorV2, Arrays.asList("scene2"))
                     .setAttribute("attribute1", "123123")
                     .callback(new ValidatorCallback() {
                         @Override

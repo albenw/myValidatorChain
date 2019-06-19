@@ -12,7 +12,7 @@ import java.util.List;
 @Getter
 public class StockVo {
 
-    private Long paId;
+    private Long id;
     private String vendorCode;
     private Integer type;
     private List<StockItemVo> items;

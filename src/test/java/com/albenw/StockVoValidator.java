@@ -23,7 +23,7 @@ public class StockVoValidator extends ValidatorAdapter<StockVo> {
         log.info("StockVoValidator into validate");
         String attribute1 = context.getAttribute("attribute1", String.class);
         log.info("attribute1={}", attribute1);
-        if(target.getPaId() == null){
+        if(target.getId() == null){
             context.appendError("stock", "合作编码为空");
             return false;
         }
